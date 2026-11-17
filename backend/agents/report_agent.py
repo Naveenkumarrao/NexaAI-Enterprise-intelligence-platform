@@ -1,8 +1,7 @@
 from backend.agents.state import AgentState
 from backend.tools.report_exporter import export_pdf, export_excel
-from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage, SystemMessage
-from backend.config import settings
+from backend.llm_factory import get_llm
 import uuid
 
 
@@ -16,7 +15,7 @@ def report_agent(state: AgentState) -> AgentState:
     instruction = state.get("user_instruction", "")
     task_type = state.get("task_type", "analysis")
 
-    llm = ChatOllama(model=settings.OLLAMA_MODEL, base_url=settings.OLLAMA_BASE_URL, temperature=0.2)
+    llm = get_llm(temperature=0.2)
 
     system_prompt = (
         "You are a senior report writer. Based on the analysis and comparison results provided, "

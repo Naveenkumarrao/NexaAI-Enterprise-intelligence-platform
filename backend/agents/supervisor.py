@@ -1,7 +1,6 @@
 from backend.agents.state import AgentState
-from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage, SystemMessage
-from backend.config import settings
+from backend.llm_factory import get_llm
 
 
 TASK_TYPE_MAP = {
@@ -38,7 +37,7 @@ def supervisor_agent(state: AgentState) -> AgentState:
     instruction = state.get("user_instruction", "")
     task_type = state.get("task_type") or detect_task_type(instruction)
 
-    llm = ChatOllama(model=settings.OLLAMA_MODEL, base_url=settings.OLLAMA_BASE_URL, temperature=0)
+    llm = get_llm(temperature=0)
 
     system_prompt = (
         "You are the supervisor of a multi-agent document intelligence platform. "

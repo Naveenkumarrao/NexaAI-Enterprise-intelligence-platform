@@ -1,7 +1,6 @@
 from backend.agents.state import AgentState
-from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage, SystemMessage
-from backend.config import settings
+from backend.llm_factory import get_llm
 
 
 def analysis_agent(state: AgentState) -> AgentState:
@@ -13,7 +12,7 @@ def analysis_agent(state: AgentState) -> AgentState:
     instruction = state.get("user_instruction", "Analyse the documents.")
     task_type = state.get("task_type", "analysis")
 
-    llm = ChatOllama(model=settings.OLLAMA_MODEL, base_url=settings.OLLAMA_BASE_URL, temperature=0.1)
+    llm = get_llm(temperature=0.1)
 
     system_prompt = (
         "You are a senior business analyst specialising in document intelligence. "

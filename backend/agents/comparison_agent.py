@@ -1,7 +1,6 @@
 from backend.agents.state import AgentState
-from langchain_ollama import ChatOllama
 from langchain_core.messages import HumanMessage, SystemMessage
-from backend.config import settings
+from backend.llm_factory import get_llm
 
 
 def comparison_agent(state: AgentState) -> AgentState:
@@ -21,7 +20,7 @@ def comparison_agent(state: AgentState) -> AgentState:
             "next": "report_agent",
         }
 
-    llm = ChatOllama(model=settings.OLLAMA_MODEL, base_url=settings.OLLAMA_BASE_URL, temperature=0.1)
+    llm = get_llm(temperature=0.1)
 
     # Build multi-doc context (truncated per doc to fit context window)
     doc_summaries = ""

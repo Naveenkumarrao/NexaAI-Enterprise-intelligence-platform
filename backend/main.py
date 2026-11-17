@@ -5,6 +5,8 @@ from backend.database import init_db
 from backend.api.documents import router as documents_router
 from backend.api.tasks import router as tasks_router
 from backend.api.analysis import router as analysis_router
+from backend.llm_factory import get_llm_info
+from backend.config import settings
 
 
 @asynccontextmanager
@@ -41,6 +43,20 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "healthy"}
+
+
+@app.get("/llm-info")
+def llm_info():
+    """Return the currently configured LLM provider and model."""
+    info = get_llm_info()
+    return {
+        "llm_provider": settings.LLM_PROVIDER,
+        "provider_label": info.get("provider", settings.LLM_PROVIDER),
+        "model": info.get("model", "unknown"),
+        "api_key_required": info.get("api_key_required", False),
+        "api_key_set": info.get("api_key_set", True),
+        "ready": info.get("api_key_set", True),
+    }
 
 
 if __name__ == "__main__":
