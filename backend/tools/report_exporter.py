@@ -6,9 +6,11 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils import get_column_letter
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List
+from xml.sax.saxutils import escape
 from backend.config import settings
 
 
@@ -38,16 +40,23 @@ def export_pdf(report_data: Dict, filename: str) -> str:
         ("analysis", "Analysis"),
         ("key_insights", "Key Insights"),
         ("risks", "Risks & Concerns"),
+        ("pros_cons", "Pros & Cons"),
+        ("numerical_data", "Numerical Data"),
+        ("comparison_strengths_weaknesses", "Comparison Strengths & Weaknesses"),
+        ("comparison_risk_assessment", "Comparison Risk Assessment"),
         ("recommendation", "Recommendation"),
+        ("analysis_raw", "Full Analysis"),
+        ("comparison_raw", "Full Comparison"),
     ]:
         content = report_data.get(section_key, "")
         if content:
             story.append(Paragraph(section_title, heading_style))
             if isinstance(content, list):
                 for item in content:
-                    story.append(Paragraph(f"• {item}", body_style))
+                    story.append(Paragraph(f"• {escape(str(item))}", body_style))
             else:
-                story.append(Paragraph(str(content), body_style))
+                safe_content = escape(str(content)).replace("\n", "<br/>")
+                story.append(Paragraph(safe_content, body_style))
             story.append(Spacer(1, 0.3*cm))
 
     comparison_table = report_data.get("comparison_table")
@@ -100,7 +109,13 @@ def export_excel(report_data: Dict, filename: str) -> str:
         ("analysis", "Analysis"),
         ("key_insights", "Key Insights"),
         ("risks", "Risks & Concerns"),
+        ("pros_cons", "Pros & Cons"),
+        ("numerical_data", "Numerical Data"),
+        ("comparison_strengths_weaknesses", "Comparison Strengths & Weaknesses"),
+        ("comparison_risk_assessment", "Comparison Risk Assessment"),
         ("recommendation", "Recommendation"),
+        ("analysis_raw", "Full Analysis"),
+        ("comparison_raw", "Full Comparison"),
     ]:
         content = report_data.get(section_key, "")
         if content:
@@ -136,8 +151,8 @@ def export_excel(report_data: Dict, filename: str) -> str:
                 ws.cell(row=row, column=col_idx, value=str(entry.get(h, "")))
             row += 1
 
-    for col in ws.columns:
-        ws.column_dimensions[col[0].column_letter].width = 30
+    for column in range(1, ws.max_column + 1):
+        ws.column_dimensions[get_column_letter(column)].width = 30
 
     wb.save(str(output_path))
     return str(output_path)

@@ -6,6 +6,7 @@ class AgentState(TypedDict):
     task_type: str                      # analysis | comparison | summary | report
     user_instruction: str
     document_ids: List[str]             # doc IDs from DB
+    document_names: Dict[str, str]      # doc ID -> original filename
     document_paths: List[str]           # file paths on disk
     extracted_texts: Dict[str, str]     # doc_id -> raw text
     chunks: Dict[str, List[str]]        # doc_id -> chunks

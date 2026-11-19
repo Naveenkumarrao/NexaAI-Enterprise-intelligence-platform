@@ -4,17 +4,17 @@ A local document-intelligence application for analyzing business documents with 
 
 ## Features
 
-- Upload and manage PDF, DOCX, TXT, and image documents.
+- Upload one or more PDF documents and describe the requested analysis in a prompt.
 - Extract document text with PDF and Word parsers, with OCR fallback for scanned documents and images.
 - Run analysis, comparison, summary, and report workflows.
 - Retrieve relevant document context using sentence-transformer embeddings and a local FAISS index.
-- Generate executive summaries, recommendations, PDF reports, and Excel reports.
-- Monitor workflow status and review workflow steps.
-- Use the calculator and total-cost-of-ownership tools.
+- Generate executive summaries, structured findings, recommendations, PDF reports, and Excel reports.
+- Watch the orchestration agent coordinate ingestion, retrieval, analysis, comparison, and report generation.
+- Review, edit, and approve generated report content before downloading updated PDF and Excel files.
 
 ## Architecture
 
-- **Frontend:** Streamlit multipage application
+- **Frontend:** Single-screen Streamlit document workflow with live agent execution and human report review
 - **API:** FastAPI
 - **Workflow orchestration:** LangGraph and LangChain
 - **Language model:** Ollama; defaults to `qwen2.5:1.5b`
@@ -98,16 +98,11 @@ uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 streamlit run frontend/app.py --server.port 8501
 ```
 
-Open the UI at <http://localhost:8501>. The API is at <http://localhost:8000>, and its interactive documentation is at <http://localhost:8000/docs>.
-
-The frontend currently uses `http://localhost:8000` as its API base URL. If you change the API port or host, update `API_BASE` in the frontend pages as well.
-
 ## Use the application
 
-1. Open **Document library** and upload one or more files.
-2. Open **AI workspace**, select the source documents, choose a workflow type, and enter instructions.
-3. Track execution in **Workflow monitor**.
-4. Open **Results and reports** to review completed results and download available reports.
+1. Upload one or more PDFs, choose Analyze, Compare, Summarize, or Generate a report, and describe the task in the prompt.
+2. Watch each agent's status and execution log while the orchestration workflow runs. Comparisons require at least two PDFs.
+3. Review and edit the generated report, then approve it to regenerate and download PDF and Excel versions.
 
 ## API overview
 
@@ -146,6 +141,3 @@ The database and generated files are stored under `data/`:
 
 These files are local application data; back them up if they need to be retained. Do not commit uploaded documents, database contents, or generated reports.
 
-## Development and deployment notes
-
-This project is configured for local development. The API currently enables CORS for all origins and does not implement authentication. Before exposing it beyond a trusted local environment, add appropriate authentication, restrict CORS, and review how uploaded documents and generated files are protected.

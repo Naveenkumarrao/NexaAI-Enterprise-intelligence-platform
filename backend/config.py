@@ -11,27 +11,24 @@ load_dotenv(BASE_DIR / ".env")
 class Settings:
     # ------------------------------------------------------------------
     # LLM Provider Selection
-    # Supported values: "ollama" | "openai" | "anthropic" | "google"
+    # Supported values: "ollama" | "openai" | "anthropic" | "google" | "gemini"
     # ------------------------------------------------------------------
     LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama")
 
-    # Ollama (local)
+    # Ollama (local — no API key needed)
     OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-    OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")
+    OLLAMA_MODEL: str    = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")
 
-    # OpenAI — API key required; base URL is optional (custom gateway / Azure proxy)
-    OPENAI_API_KEY: str  = os.getenv("OPENAI_API_KEY", "")
-    OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "")   # optional
-    OPENAI_MODEL: str    = "gpt-4o-mini"                       # default, not in .env
+    # Single API key — shared across all cloud providers
+    API_KEY: str  = os.getenv("API_KEY", "")
 
-    # Anthropic — API key required; base URL is optional (custom gateway)
-    ANTHROPIC_API_KEY: str  = os.getenv("ANTHROPIC_API_KEY", "")
-    ANTHROPIC_BASE_URL: str = os.getenv("ANTHROPIC_BASE_URL", "")  # optional
-    ANTHROPIC_MODEL: str    = "claude-3-haiku-20240307"             # default, not in .env
+    # Optional gateway — custom base URL, proxy, or Azure endpoint
+    GATEWAY: str  = os.getenv("GATEWAY", "")
 
-    # Google Gemini — API key required
-    GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
-    GOOGLE_MODEL: str   = "gemini-1.5-flash"                   # default, not in .env
+    # Built-in model defaults (not exposed in .env)
+    OPENAI_MODEL:    str = "gpt-4o-mini"
+    ANTHROPIC_MODEL: str = "claude-3-haiku-20240307"
+    GOOGLE_MODEL:    str = "gemini-1.5-flash"
 
     # ------------------------------------------------------------------
     # Paths
@@ -59,18 +56,14 @@ class Settings:
         self._validate()
 
     def _validate(self):
-        """Warn at startup if the selected provider has no API key configured."""
+        """Warn at startup if a cloud provider is selected but API_KEY is missing."""
         provider = self.LLM_PROVIDER.lower()
-        missing = {
-            "openai":    not self.OPENAI_API_KEY,
-            "anthropic": not self.ANTHROPIC_API_KEY,
-            "google":    not self.GOOGLE_API_KEY,
-        }
-        if provider in missing and missing[provider]:
+        cloud_providers = {"openai", "anthropic", "google", "gemini"}
+        if provider in cloud_providers and not self.API_KEY:
             import warnings
             warnings.warn(
-                f"[NexaAI] LLM_PROVIDER is '{provider}' but the corresponding "
-                f"API key is not set in .env. Set the key or switch to 'ollama'.",
+                f"[NexaAI] LLM_PROVIDER is '{provider}' but API_KEY is not set in .env. "
+                "Add your API key or switch to LLM_PROVIDER=ollama.",
                 stacklevel=2,
             )
 

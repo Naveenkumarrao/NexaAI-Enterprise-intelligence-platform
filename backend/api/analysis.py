@@ -5,8 +5,9 @@ from sqlalchemy import select
 from pathlib import Path
 from backend.database import get_db, TaskRecord
 from backend.tools.calculator_tool import safe_calculate, compute_tco, compare_numeric_values
-from pydantic import BaseModel
-from typing import Dict, Optional
+from backend.tools.report_exporter import export_pdf, export_excel
+from pydantic import BaseModel, Field
+from typing import Any, Dict, List, Optional
 
 router = APIRouter(prefix="/analysis", tags=["Analysis"])
 
@@ -28,12 +29,66 @@ async def get_task_result(task_id: str, db: AsyncSession = Depends(get_db)):
     }
 
 
+class ReportUpdateRequest(BaseModel):
+    summary: str
+    key_insights: List[str] = Field(default_factory=list)
+    risks: str = ""
+    pros_cons: str = ""
+    numerical_data: str = ""
+    recommendation: str = ""
+    comparison_strengths_weaknesses: str = ""
+    comparison_risk_assessment: str = ""
+    comparison_table: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+@router.put("/task/{task_id}/report")
+async def update_task_report(
+    task_id: str,
+    req: ReportUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(TaskRecord).where(TaskRecord.id == task_id))
+    task = result.scalar_one_or_none()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if task.status != "completed":
+        raise HTTPException(status_code=409, detail="Only completed reports can be edited")
+
+    task_result = dict(task.result or {})
+    report_data = {**(task_result.get("report") or {}), **req.model_dump()}
+    report_name = f"report_{task_id}"
+    pdf_path = export_pdf(report_data, report_name)
+    excel_path = export_excel(report_data, report_name)
+
+    task_result.update(
+        {
+            "report": report_data,
+            "pdf_path": pdf_path,
+            "excel_path": excel_path,
+            "human_approved": True,
+        }
+    )
+    task.result = task_result
+    task.workflow_steps = list(task.workflow_steps or []) + [
+        "human_review: report reviewed and approved"
+    ]
+    await db.commit()
+    return {
+        "task_id": task_id,
+        "report": report_data,
+        "pdf_path": pdf_path,
+        "excel_path": excel_path,
+    }
+
+
 @router.get("/task/{task_id}/download/pdf")
 async def download_pdf(task_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(TaskRecord).where(TaskRecord.id == task_id))
     task = result.scalar_one_or_none()
     if not task or task.status != "completed":
         raise HTTPException(status_code=404, detail="Task not completed or not found")
+    if not task.result or not task.result.get("human_approved"):
+        raise HTTPException(status_code=409, detail="Report requires human review and approval")
     pdf_path = task.result.get("pdf_path", "") if task.result else ""
     if not pdf_path or not Path(pdf_path).exists():
         raise HTTPException(status_code=404, detail="PDF not found")
@@ -46,6 +101,8 @@ async def download_excel(task_id: str, db: AsyncSession = Depends(get_db)):
     task = result.scalar_one_or_none()
     if not task or task.status != "completed":
         raise HTTPException(status_code=404, detail="Task not completed or not found")
+    if not task.result or not task.result.get("human_approved"):
+        raise HTTPException(status_code=409, detail="Report requires human review and approval")
     excel_path = task.result.get("excel_path", "") if task.result else ""
     if not excel_path or not Path(excel_path).exists():
         raise HTTPException(status_code=404, detail="Excel file not found")

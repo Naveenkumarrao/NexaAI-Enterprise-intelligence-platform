@@ -2,8 +2,8 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel
-from typing import List, Optional
+from pydantic import BaseModel, Field, field_validator
+from typing import List, Literal
 from backend.database import get_db, TaskRecord, DocumentRecord
 from backend.graph.workflow import run_workflow
 from backend.agents.state import AgentState
@@ -12,9 +12,17 @@ router = APIRouter(prefix="/tasks", tags=["Tasks"])
 
 
 class TaskCreateRequest(BaseModel):
-    user_instruction: str
-    task_type: Optional[str] = ""
-    document_ids: List[str]
+    user_instruction: str = Field(min_length=1)
+    task_type: Literal["analysis", "comparison", "summary", "report"] = "analysis"
+    document_ids: List[str] = Field(min_length=1)
+
+    @field_validator("user_instruction")
+    @classmethod
+    def instruction_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("User instruction must not be blank")
+        return value
 
 
 async def execute_workflow_task(task_id: str, state: AgentState):
@@ -27,11 +35,30 @@ async def execute_workflow_task(task_id: str, state: AgentState):
             await db.execute(
                 sql_update(TaskRecord)
                 .where(TaskRecord.id == task_id)
-                .values(status="running", updated_at=datetime.utcnow())
+                .values(
+                    status="running",
+                    workflow_steps=["supervisor: running"],
+                    updated_at=datetime.utcnow(),
+                )
             )
             await db.commit()
 
-            final_state = await run_workflow(state)
+            async def save_progress(agent_state: AgentState):
+                steps = list(agent_state.get("workflow_steps", []))
+                next_agent = agent_state.get("next", "")
+                if next_agent and next_agent != "END":
+                    steps.append(f"{next_agent}: running")
+                await db.execute(
+                    sql_update(TaskRecord)
+                    .where(TaskRecord.id == task_id)
+                    .values(
+                        workflow_steps=steps,
+                        updated_at=datetime.utcnow(),
+                    )
+                )
+                await db.commit()
+
+            final_state = await run_workflow(state, progress_callback=save_progress)
 
             result = {
                 "analysis": final_state.get("analysis_result", {}),
@@ -39,6 +66,10 @@ async def execute_workflow_task(task_id: str, state: AgentState):
                 "report": final_state.get("report_data", {}),
                 "pdf_path": final_state.get("pdf_path", ""),
                 "excel_path": final_state.get("excel_path", ""),
+                "documents": [
+                    {"doc_id": doc_id, "filename": filename}
+                    for doc_id, filename in final_state.get("document_names", {}).items()
+                ],
             }
 
             await db.execute(
@@ -68,19 +99,27 @@ async def create_task(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
+    if req.task_type == "comparison" and len(set(req.document_ids)) < 2:
+        raise HTTPException(
+            status_code=422,
+            detail="Comparison workflows require at least two distinct documents",
+        )
+
     # Validate documents exist
     doc_paths = []
+    document_names = {}
     for doc_id in req.document_ids:
         result = await db.execute(select(DocumentRecord).where(DocumentRecord.id == doc_id))
         doc = result.scalar_one_or_none()
         if not doc:
             raise HTTPException(status_code=404, detail=f"Document {doc_id} not found")
         doc_paths.append(doc.file_path)
+        document_names[doc_id] = doc.filename
 
     task_id = str(uuid.uuid4())
     record = TaskRecord(
         id=task_id,
-        task_type=req.task_type or "analysis",
+        task_type=req.task_type,
         user_instruction=req.user_instruction,
         status="pending",
         workflow_steps=[],
@@ -90,9 +129,10 @@ async def create_task(
 
     initial_state: AgentState = {
         "task_id": task_id,
-        "task_type": req.task_type or "",
+        "task_type": req.task_type,
         "user_instruction": req.user_instruction,
         "document_ids": req.document_ids,
+        "document_names": document_names,
         "document_paths": doc_paths,
         "extracted_texts": {},
         "chunks": {},

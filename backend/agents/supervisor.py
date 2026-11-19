@@ -1,6 +1,4 @@
 from backend.agents.state import AgentState
-from langchain_core.messages import HumanMessage, SystemMessage
-from backend.llm_factory import get_llm
 
 
 TASK_TYPE_MAP = {
@@ -28,35 +26,19 @@ def detect_task_type(instruction: str) -> str:
 
 def supervisor_agent(state: AgentState) -> AgentState:
     """
-    Understands user goal, plans the workflow and coordinates all agents.
-    Determines task_type and sets the initial routing.
+    Preserve the requested workflow type and route into document ingestion.
     """
-    steps = state.get("workflow_steps", [])
+    steps = list(state.get("workflow_steps", []))
     steps.append("supervisor: started")
 
     instruction = state.get("user_instruction", "")
-    task_type = state.get("task_type") or detect_task_type(instruction)
+    task_type = state.get("task_type")
+    if task_type not in {"analysis", "comparison", "summary", "report"}:
+        task_type = detect_task_type(instruction)
 
-    llm = get_llm(temperature=0)
-
-    system_prompt = (
-        "You are the supervisor of a multi-agent document intelligence platform. "
-        "Given the user instruction and task type, confirm the execution plan. "
-        "Respond with ONLY the task type as one word: analysis | comparison | summary | report"
-    )
-    user_prompt = f"User Instruction: {instruction}\nDetected Task Type: {task_type}\nConfirm task type:"
-
-    try:
-        messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
-        response = llm.invoke(messages)
-        confirmed = response.content.strip().lower().split()[0]
-        if confirmed in ["analysis", "comparison", "summary", "report"]:
-            task_type = confirmed
-        steps.append(f"supervisor: task_type confirmed -> {task_type}")
-    except Exception as e:
-        steps.append(f"supervisor: LLM confirmation failed, using detected -> {task_type}: {e}")
-
+    steps.append(f"supervisor: selected workflow -> {task_type}")
     steps.append("supervisor: routing to ingestion_agent")
+    steps.append("supervisor: completed")
     return {
         **state,
         "task_type": task_type,

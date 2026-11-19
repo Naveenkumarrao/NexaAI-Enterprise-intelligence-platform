@@ -12,13 +12,7 @@ def comparison_agent(state: AgentState) -> AgentState:
     instruction = state.get("user_instruction", "Compare these documents.")
 
     if len(extracted_texts) < 2:
-        steps.append("comparison_agent: less than 2 documents, skipping comparison")
-        return {
-            **state,
-            "comparison_result": {"note": "Comparison requires at least 2 documents."},
-            "workflow_steps": steps,
-            "next": "report_agent",
-        }
+        raise ValueError("Comparison requires at least two documents")
 
     llm = get_llm(temperature=0.1)
 
@@ -49,10 +43,12 @@ def comparison_agent(state: AgentState) -> AgentState:
         messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
         response = llm.invoke(messages)
         comparison_text = response.content
+        if not comparison_text or not comparison_text.strip():
+            raise RuntimeError("The language model returned an empty comparison")
         steps.append("comparison_agent: LLM comparison completed")
     except Exception as e:
-        comparison_text = f"Comparison failed: {e}"
         steps.append(f"comparison_agent: LLM error -> {e}")
+        raise RuntimeError(f"Comparison agent failed: {e}") from e
 
     def extract_section(text: str, section: str) -> str:
         import re

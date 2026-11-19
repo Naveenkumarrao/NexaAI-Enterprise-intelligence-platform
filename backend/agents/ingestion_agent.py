@@ -27,9 +27,11 @@ def ingestion_agent(state: AgentState) -> AgentState:
             chunks[doc_id] = result["chunks"]
             steps.append(f"ingestion_agent: extracted {len(text)} chars from {doc_id}")
         except Exception as e:
-            extracted_texts[doc_id] = ""
-            chunks[doc_id] = []
             steps.append(f"ingestion_agent: error on {doc_id} -> {e}")
+            raise RuntimeError(f"Could not extract text from document {doc_id}: {e}") from e
+
+        if not text.strip():
+            raise RuntimeError(f"No text could be extracted from document {doc_id}")
 
     steps.append("ingestion_agent: completed")
     return {

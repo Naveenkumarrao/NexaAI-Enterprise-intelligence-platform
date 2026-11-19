@@ -37,10 +37,12 @@ def analysis_agent(state: AgentState) -> AgentState:
         messages = [SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)]
         response = llm.invoke(messages)
         analysis_text = response.content
+        if not analysis_text or not analysis_text.strip():
+            raise RuntimeError("The language model returned an empty analysis")
         steps.append("analysis_agent: LLM analysis completed")
     except Exception as e:
-        analysis_text = f"Analysis could not be completed: {e}"
         steps.append(f"analysis_agent: LLM error -> {e}")
+        raise RuntimeError(f"Analysis agent failed: {e}") from e
 
     # Parse structured sections
     def extract_section(text: str, section: str) -> str:

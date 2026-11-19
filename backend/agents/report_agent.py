@@ -56,7 +56,13 @@ def report_agent(state: AgentState) -> AgentState:
         "analysis": analysis.get("key_insights", ""),
         "key_insights": [l.strip("•- ") for l in analysis.get("key_insights", "").split("\n") if l.strip()],
         "risks": analysis.get("risks", "") or comparison.get("risk_assessment", ""),
+        "pros_cons": analysis.get("pros_cons", ""),
+        "numerical_data": analysis.get("numerical_data", ""),
         "recommendation": final_recommendation or comparison.get("recommendation", ""),
+        "comparison_strengths_weaknesses": comparison.get("strengths_weaknesses", ""),
+        "comparison_risk_assessment": comparison.get("risk_assessment", ""),
+        "analysis_raw": analysis.get("raw", ""),
+        "comparison_raw": comparison.get("raw", ""),
         "comparison_table": comparison.get("comparison_table", []),
     }
 

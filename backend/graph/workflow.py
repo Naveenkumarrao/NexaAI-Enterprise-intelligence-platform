@@ -6,6 +6,8 @@ from backend.agents.retrieval_agent import retrieval_agent
 from backend.agents.analysis_agent import analysis_agent
 from backend.agents.comparison_agent import comparison_agent
 from backend.agents.report_agent import report_agent
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 
 def route_after_supervisor(state: AgentState) -> str:
@@ -80,7 +82,14 @@ def build_workflow() -> StateGraph:
 workflow_app = build_workflow()
 
 
-async def run_workflow(initial_state: AgentState) -> AgentState:
-    """Run the full LangGraph multi-agent workflow."""
-    result = await workflow_app.ainvoke(initial_state)
-    return result
+async def run_workflow(
+    initial_state: AgentState,
+    progress_callback: Callable[[AgentState], Awaitable[None]] | None = None,
+) -> AgentState:
+    """Run the workflow and publish each completed agent state when requested."""
+    final_state: dict[str, Any] = initial_state
+    async for state in workflow_app.astream(initial_state, stream_mode="values"):
+        final_state = state
+        if progress_callback:
+            await progress_callback(state)
+    return final_state
